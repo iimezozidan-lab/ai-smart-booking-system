@@ -1,0 +1,292 @@
+{
+  "name": "Smart Booking API Test",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *\nFROM services\nWHERE service_name = '{{ $json.service_name }}'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        600,
+        -440
+      ],
+      "id": "dfc17d62-e076-4273-8995-8fd6769c31ef",
+      "name": "Get Customers",
+      "credentials": {
+        "postgres": {
+          "id": "TWDiw9dzaF8URGBM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM services;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        900,
+        -440
+      ],
+      "id": "1361be5f-68fd-42b6-bb14-33482da6ed6e",
+      "name": "Get Services",
+      "credentials": {
+        "postgres": {
+          "id": "TWDiw9dzaF8URGBM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bookings (customer_id, service_id, booking_date, status)\nVALUES (\n  {{ $('Get Customers').item.json.id }},\n  {{ $('Get Services').item.json.id }},\n  '{{ $('Code').item.json.booking_date }}',\n  'pending'\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1320,
+        -460
+      ],
+      "id": "66c67745-a912-40cd-87fb-1178d269f1d2",
+      "name": "Create Booking",
+      "credentials": {
+        "postgres": {
+          "id": "TWDiw9dzaF8URGBM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "iimezo.zidan@gmail.com",
+        "toEmail": "={{ $('Code').item.json.email }}",
+        "subject": "Booking Confirmation",
+        "emailFormat": "text",
+        "text": "Hello,\n\nYour booking has been created successfully.\n\nThank you.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        -460
+      ],
+      "id": "97f070a1-06f9-44b5-9e5b-c84cd6350d98",
+      "name": "Send email",
+      "webhookId": "8c82f7c4-c5b2-4086-b511-c9b49f60fc6f",
+      "credentials": {
+        "smtp": {
+          "id": "3q5qIKOqw5VM1zUf",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "630e5e5e97a02251f8b91262b47eef881cc59d69dab852170101e016181dd763@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Smart Booking Appointment"
+        },
+        "additionalFields": {
+          "summary": "Smart Booking Appointment"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2260,
+        -440
+      ],
+      "id": "9c06e06f-d251-4ebc-8988-97bea4c3bc4f",
+      "name": "Create an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "ldbiSSqwn3KhTeMC",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -300,
+        -460
+      ],
+      "id": "bbeb54c0-64f0-4e7f-9d80-81c23e93d272",
+      "name": "When chat message received",
+      "webhookId": "3c3dfc8b-8f0c-4ecb-bb35-eea5c32c86b9"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Extract booking information from this message:\n\n{{ $json.chatInput }}\n\nReturn ONLY valid JSON.\n\nFormat:\n{\n  \"service_name\": \"\",\n  \"booking_time\": \"\",\n  \"email\": \"\",\n  \"phone\": \"\"\n}\n\nRules:\n- service_name must be one of:\n  Hair Cut\n  Shaving\n  Massage\n- No explanations\n- No extra text\n- Only JSON",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        -60,
+        -460
+      ],
+      "id": "4cd90a1d-f957-41f0-924a-f038a6e4b299",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -240
+      ],
+      "id": "a51c72d8-5b0a-4d07-916e-114aca53e600",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "PglRsHnGgeyyFsxE",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.first().json.text;\n\nconst cleanText = text\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\nconst data = JSON.parse(cleanText);\n\nreturn [\n  {\n    json: {\n      service_name: data.service_name,\n      booking_time: data.booking_time,\n      email: data.email,\n      phone: data.phone,\n      booking_date: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -440
+      ],
+      "id": "6843d1c5-9db9-422c-b1e2-7ac9474c6e6f",
+      "name": "Code"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Customers": {
+      "main": [
+        [
+          {
+            "node": "Get Services",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Services": {
+      "main": [
+        [
+          {
+            "node": "Create Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Booking": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send email": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        []
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Get Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6891c8ad-b296-43ec-aaed-17f7c99d2da9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0d597bc4579aba1bf0928fff3ab18156d8247baa406ed8ad554e19f84e0a86ed"
+  },
+  "id": "IYMbcuEF5WNNMn9x",
+  "tags": []
+}
